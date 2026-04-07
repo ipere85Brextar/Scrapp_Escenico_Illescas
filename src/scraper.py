@@ -16,6 +16,7 @@ from config import (
     EXCLUDE_SELECTORS,
     MAX_RETRIES,
     REQUEST_TIMEOUT_SECONDS,
+    TICKET_LINK_SELECTORS,
     USER_AGENT,
 )
 
@@ -122,6 +123,38 @@ def extract_links(html: str) -> list[dict[str, str]]:
         text = a_tag.get_text(strip=True)
         if href and not href.startswith("#"):
             links.append({"href": href, "text": text.lower()})
+    return links
+
+
+def extract_ticket_links(
+    html: str,
+    selectors: list[str] | None = None,
+) -> list[dict[str, str]]:
+    """
+    Extrae links solo de las zonas de entradas (.esc-ticket-box, .esc-cta-box, .esc-btn).
+    Un link externo aqui es la senal principal de que las entradas estan a la venta.
+
+    Returns:
+        Lista de dicts con keys: "href", "text".
+    """
+    selectors = selectors or TICKET_LINK_SELECTORS
+    soup = BeautifulSoup(html, "lxml")
+    links = []
+    seen = set()
+
+    for sel in selectors:
+        for container in soup.select(sel):
+            for a_tag in container.find_all("a", href=True):
+                href = a_tag["href"].strip()
+                text = a_tag.get_text(strip=True)
+                if (
+                    href
+                    and not href.startswith("#")
+                    and href.startswith("http")
+                    and href not in seen
+                ):
+                    links.append({"href": href, "text": text.lower()})
+                    seen.add(href)
     return links
 
 

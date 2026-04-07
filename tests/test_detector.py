@@ -3,10 +3,8 @@ Tests para el modulo detector.
 """
 
 import sys
-import os
 from pathlib import Path
 
-# Agregar src/ al path para imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 import pytest
@@ -32,8 +30,8 @@ class TestAnalyze:
         html = _load_fixture("sample_page.html")
         result = analyze(html, previous_hash=None)
 
-        assert result.content_hash  # Tiene hash
-        assert result.hash_changed is False  # Primer check, no hay referencia
+        assert result.content_hash
+        assert result.hash_changed is False
         assert result.alert_level == "low"
         assert result.ticket_keywords_found == []
         assert result.ticket_urls_found == []
@@ -58,12 +56,20 @@ class TestAnalyze:
 
         assert second.hash_changed is True
 
-    def test_tickets_detected(self):
-        """Pagina con entradas debe dar alert_level=high."""
+    def test_tickets_detected_via_links(self):
+        """Pagina con entradas debe dar alert_level=high (link en zona de entradas)."""
         html = _load_fixture("sample_page_with_tickets.html")
         result = analyze(html, previous_hash=None)
 
         assert result.alert_level == "high"
+        assert len(result.ticket_links_in_zone) > 0
+        assert any("entradas.com" in url for url in result.ticket_links_in_zone)
+
+    def test_tickets_detected_via_keywords(self):
+        """Pagina con entradas debe tener keywords positivos."""
+        html = _load_fixture("sample_page_with_tickets.html")
+        result = analyze(html, previous_hash=None)
+
         assert len(result.ticket_keywords_found) > 0
         assert any("comprar entradas" in kw for kw in result.ticket_keywords_found)
 
@@ -84,12 +90,14 @@ class TestAnalyze:
         assert len(result.soldout_keywords_found) > 0
         assert any("agotadas" in kw for kw in result.soldout_keywords_found)
 
-    def test_venta_online_keyword(self):
-        """'venta online' debe detectarse como keyword positivo."""
-        html = _load_fixture("sample_page_with_tickets.html")
+    def test_pending_page_no_false_positive(self):
+        """Pagina con 'proximamente' NO debe dar alerta alta por keywords genericos."""
+        html = _load_fixture("sample_page.html")
         result = analyze(html, previous_hash=None)
 
-        assert "venta online" in result.ticket_keywords_found
+        assert result.alert_level == "low"
+        assert len(result.pending_keywords_found) > 0
+        assert any("próximamente" in kw or "muy pronto" in kw for kw in result.pending_keywords_found)
 
     def test_hash_is_deterministic(self):
         """Mismo HTML siempre produce el mismo hash."""
@@ -118,13 +126,8 @@ class TestFindKeywords:
 
     def test_no_match(self):
         text = "informacion general del teatro"
-        found = _find_keywords(text, ["comprar entradas", "venta online"])
+        found = _find_keywords(text, ["comprar entradas"])
         assert found == []
-
-    def test_venta_online(self):
-        text = "venta online disponible"
-        found = _find_keywords(text, ["venta online", "comprar entradas"])
-        assert "venta online" in found
 
 
 class TestFindTicketUrls:

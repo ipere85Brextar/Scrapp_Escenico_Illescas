@@ -8,7 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 import pytest
-from scraper import extract_content, extract_links, extract_title, _normalize_text
+from scraper import extract_content, extract_links, extract_ticket_links, extract_title, _normalize_text
 
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
@@ -21,31 +21,28 @@ def _load_fixture(name: str) -> str:
 class TestExtractContent:
     """Tests para extract_content."""
 
-    def test_extracts_main_content(self):
-        """Debe extraer contenido del <main> tag."""
+    def test_extracts_event_content(self):
+        """Debe extraer contenido del .esc-event."""
         html = _load_fixture("sample_page.html")
         content = extract_content(html)
 
-        assert "programación 2026" in content
-        assert "rey león" in content
-        assert "concierto de primavera" in content
+        assert "juan dávila" in content
+        assert "illescas" in content
+        assert "plaza de toros" in content
 
     def test_excludes_header_footer(self):
         """No debe incluir contenido de header/footer."""
         html = _load_fixture("sample_page.html")
         content = extract_content(html)
 
-        # El nav link "Inicio" esta en el header, que se excluye
-        # El copyright esta en footer, que se excluye
         assert "© 2026" not in content
 
-    def test_excludes_social_media(self):
-        """No debe incluir links de redes sociales del footer."""
+    def test_excludes_map(self):
+        """No debe incluir el mapa (.esc-map-wrap)."""
         html = _load_fixture("sample_page.html")
         content = extract_content(html)
 
-        assert "facebook" not in content
-        assert "instagram" not in content
+        assert "cómo llegar" not in content
 
     def test_content_is_normalized(self):
         """El contenido debe estar normalizado (lowercase, sin espacios dobles)."""
@@ -61,15 +58,15 @@ class TestExtractContent:
         content = extract_content(html)
 
         assert "comprar entradas" in content
-        assert "venta online" in content
+        assert "entradas disponibles" in content
 
-    def test_custom_selectors(self):
-        """Debe respetar selectores custom."""
+    def test_pending_keywords_present(self):
+        """Pagina sin entradas debe tener keywords de pendiente."""
         html = _load_fixture("sample_page.html")
-        # Solo extraer del article
-        content = extract_content(html, selectors=["article"], exclude=[])
+        content = extract_content(html)
 
-        assert "rey león" in content
+        assert "próximamente" in content
+        assert "muy pronto" in content
 
 
 class TestExtractLinks:
@@ -79,7 +76,6 @@ class TestExtractLinks:
         html = _load_fixture("sample_page_with_tickets.html")
         links = extract_links(html)
 
-        # Debe tener links de nav + ticket + social
         hrefs = [l["href"] for l in links]
         assert any("entradas.com" in h for h in hrefs)
 
@@ -96,6 +92,33 @@ class TestExtractLinks:
         links = extract_links(html)
 
         assert links[0]["text"] == "comprar entradas"
+
+
+class TestExtractTicketLinks:
+    """Tests para extract_ticket_links."""
+
+    def test_finds_links_in_ticket_box(self):
+        """Debe encontrar links dentro de .esc-ticket-box."""
+        html = _load_fixture("sample_page_with_tickets.html")
+        links = extract_ticket_links(html)
+
+        assert len(links) > 0
+        assert any("entradas.com" in l["href"] for l in links)
+
+    def test_no_links_in_pending_page(self):
+        """Pagina 'proximamente' no debe tener links de compra en zona de entradas."""
+        html = _load_fixture("sample_page.html")
+        links = extract_ticket_links(html)
+
+        assert len(links) == 0
+
+    def test_deduplicates_links(self):
+        """No debe duplicar el mismo link si aparece en ticket-box y cta-box."""
+        html = _load_fixture("sample_page_with_tickets.html")
+        links = extract_ticket_links(html)
+
+        hrefs = [l["href"] for l in links]
+        assert len(hrefs) == len(set(hrefs))
 
 
 class TestExtractTitle:

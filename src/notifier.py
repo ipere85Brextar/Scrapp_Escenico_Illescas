@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 
 import httpx
 
-from config import TELEGRAM_API_BASE, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, TARGET_URL
+from config import TELEGRAM_API_BASE, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
 
 logger = logging.getLogger(__name__)
 
@@ -18,20 +18,28 @@ class NotifierError(Exception):
     """Error al enviar mensaje de Telegram."""
 
 
-def send_alert(alert_level: str, reason: str, details: dict | None = None) -> bool:
+def send_alert(
+    alert_level: str,
+    reason: str,
+    event_url: str = "",
+    event_name: str = "",
+    details: dict | None = None,
+) -> bool:
     """
     Envia una alerta al chat de Telegram segun el nivel.
 
     Args:
         alert_level: "high", "high_soldout", "medium".
         reason: Descripcion legible del motivo.
-        details: Dict opcional con keys: ticket_keywords, ticket_urls, soldout_keywords.
+        event_url: URL del evento.
+        event_name: Nombre/titulo del evento.
+        details: Dict opcional con keys: ticket_keywords, ticket_urls, ticket_links, soldout_keywords.
 
     Returns:
         True si se envio correctamente, False si hubo error.
     """
     details = details or {}
-    message = _format_alert_message(alert_level, reason, details)
+    message = _format_alert_message(alert_level, reason, event_url, event_name, details)
     return _send_telegram_message(message)
 
 
@@ -84,12 +92,18 @@ def send_recovery_alert() -> bool:
 # --- Formateo de mensajes ---
 
 
-def _format_alert_message(alert_level: str, reason: str, details: dict) -> str:
+def _format_alert_message(
+    alert_level: str, reason: str, event_url: str, event_name: str, details: dict
+) -> str:
     """Construye el mensaje de alerta formateado en MarkdownV2."""
+    name = event_name or "El Escenico de Illescas"
 
     if alert_level == "high":
-        header = "🎫🔴 *ENTRADAS DETECTADAS \\- El Escenico de Illescas*"
+        header = f"🎫🔴 *ENTRADAS DETECTADAS*\n{_escape_md(name)}"
         body_parts = [_escape_md(reason)]
+        if details.get("ticket_links"):
+            urls = "\n".join(details["ticket_links"])
+            body_parts.append(f"Links de compra:\n{_escape_md(urls)}")
         if details.get("ticket_keywords"):
             kws = ", ".join(details["ticket_keywords"])
             body_parts.append(f"Keywords: {_escape_md(kws)}")
@@ -98,24 +112,23 @@ def _format_alert_message(alert_level: str, reason: str, details: dict) -> str:
             body_parts.append(f"URLs de ticketing:\n{_escape_md(urls)}")
 
     elif alert_level == "high_soldout":
-        header = "🎫🟠 *ENTRADAS AGOTADAS \\- El Escenico de Illescas*"
+        header = f"🎫🟠 *ENTRADAS AGOTADAS*\n{_escape_md(name)}"
         body_parts = [_escape_md(reason)]
         if details.get("soldout_keywords"):
             kws = ", ".join(details["soldout_keywords"])
             body_parts.append(f"Indicadores: {_escape_md(kws)}")
 
     elif alert_level == "medium":
-        header = "📄🟡 *CAMBIO DETECTADO \\- El Escenico de Illescas*"
-        body_parts = [
-            "La pagina ha cambiado\\. Puede que haya novedades\\.",
-        ]
+        header = f"📄🟡 *CAMBIO DETECTADO*\n{_escape_md(name)}"
+        body_parts = [_escape_md(reason)]
 
     else:
         return ""
 
-    link = _escape_md(TARGET_URL)
+    link = _escape_md(event_url) if event_url else ""
     body = "\n".join(body_parts)
-    return f"{header}\n\n{body}\n\n🔗 {link}"
+    footer = f"\n\n🔗 {link}" if link else ""
+    return f"{header}\n\n{body}{footer}"
 
 
 def _format_heartbeat_message(stats: dict) -> str:

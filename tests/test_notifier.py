@@ -49,25 +49,31 @@ class TestFormatAlertMessage:
         msg = _format_alert_message(
             "high",
             "Entradas detectadas",
+            "https://elescenicodeillescas.es/evento",
+            "Juan Dávila Illescas 2026",
             {"ticket_keywords": ["comprar entradas"], "ticket_urls": ["https://entradas.com/x"]},
         )
         assert "ENTRADAS DETECTADAS" in msg
         assert "comprar entradas" in msg
+        assert "Juan" in msg
 
     def test_soldout_alert(self):
         msg = _format_alert_message(
             "high_soldout",
             "Agotadas",
+            "https://elescenicodeillescas.es/evento",
+            "Pignoise Illescas 2026",
             {"soldout_keywords": ["agotadas"]},
         )
         assert "AGOTADAS" in msg
+        assert "Pignoise" in msg
 
     def test_medium_alert(self):
-        msg = _format_alert_message("medium", "Cambio", {})
+        msg = _format_alert_message("medium", "Cambio", "", "", {})
         assert "CAMBIO DETECTADO" in msg
 
     def test_low_returns_empty(self):
-        msg = _format_alert_message("low", "", {})
+        msg = _format_alert_message("low", "", "", "", {})
         assert msg == ""
 
 
