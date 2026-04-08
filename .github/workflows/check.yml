@@ -1,0 +1,31 @@
+name: Check Escénico
+
+on:
+  schedule:
+    # Cada 5 minutos
+    - cron: '*/5 * * * *'
+  workflow_dispatch: # Permite ejecución manual
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install httpx beautifulsoup4 lxml
+
+      - name: Run check
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          STATE_GIST_ID: ${{ secrets.STATE_GIST_ID }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: python run_check.py

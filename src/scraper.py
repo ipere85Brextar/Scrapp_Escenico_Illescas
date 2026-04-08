@@ -42,7 +42,14 @@ def fetch_page(url: str, timeout: int | None = None) -> str:
         ScraperError: Si no se puede descargar tras los reintentos.
     """
     timeout = timeout or REQUEST_TIMEOUT_SECONDS
-    headers = {"User-Agent": USER_AGENT}
+    headers = {
+        "User-Agent": USER_AGENT,
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Connection": "keep-alive",
+        "Upgrade-Insecure-Requests": "1",
+    }
     last_error = None
 
     for attempt in range(1 + MAX_RETRIES):
